@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,100..900;1,100..900&family=Inter:wght@100..900&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body,
+      html {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        background-color: white;
+        font-family: "Inter Tight", sans-serif;
+      }
+      #canvas {
+        position: absolute;
+        z-index: 1;
+      }
+      #controls {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        z-index: 2;
+        background-color: rgba(255, 255, 255, 0.8);
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      }
+      #textInput {
+        width: 200px;
+        padding: 5px;
+        margin-right: 10px;
+        font-size: 16px;
+      }
+      #submitButton {
+        padding: 5px 10px;
+        font-size: 16px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <div id="controls">
+      <input
+        type="text"
+        id="textInput"
+        placeholder="Enter your text"
+        maxlength="20"
+      />
+      <button id="submitButton">Apply Effect</button>
+    </div>
+
+    <script>
+      // Get canvas and context
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+      const textInput = document.getElementById("textInput");
+      const submitButton = document.getElementById("submitButton");
+
+      // Set canvas size
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      let particles = [];
+      let mouse = { x: null, y: null, radius: 120 };
+      let currentText = "astnai";
+
+      // Particle class definition
+      class Particle {
+        constructor(x, y, alpha = 1) {
+          this.x = this.originX = x;
+          this.y = this.originY = y;
+          this.size = 1.5;
+          this.vx = 0;
+          this.vy = 0;
+          this.alpha = alpha;
+          this.friction = 0.95;
+          this.ease = 0.05;
+        }
+
+        // Draw particle on canvas
+        draw() {
+          ctx.fillStyle = `rgba(0, 0, 0, ${this.alpha})`;
+          ctx.fillRect(this.x, this.y, this.size, this.size);
+        }
+
+        // Update particle position and velocity
+        update() {
+          let dx = mouse.x - this.x;
+          let dy = mouse.y - this.y;
+          let distance = Math.sqrt(dx * dx + dy * dy);
+          let force = (mouse.radius - distance) / mouse.radius;
+
+          // Apply force if within radius
+          if (distance < mouse.radius) {
+            let angle = Math.atan2(dy, dx);
+            this.vx -= force * Math.cos(angle) * 0.8;
+            this.vy -= force * Math.sin(angle) * 0.8;
+          }
+
+          // Apply velocity and friction
+          this.x += this.vx;
+          this.y += this.vy;
+          this.vx *= this.friction;
+          this.vy *= this.friction;
+
+          // Ease back to origin
+          this.x += (this.originX - this.x) * this.ease;
+          this.y += (this.originY - this.y) * this.ease;
+        }
+      }
+
+      // Function to set and initialize text
+      function PlaceYourText(text) {
+        currentText = text || "astnai";
+        init();
+      }
+
+      // Initialize particles based on text
+      function init() {
+        particles = [];
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "black";
+        ctx.font = "800 260px 'Inter Tight'";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(currentText, canvas.width / 2, canvas.height / 2);
+
+        // Get image data from canvas
+        const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Create particles from image data
+        for (let y = 0; y < canvas.height; y += 2) {
+          for (let x = 0; x < canvas.width; x += 2) {
+            if (data[(y * canvas.width + x) * 4 + 3] > 128) {
+              particles.push(new Particle(x, y));
+            }
+          }
+        }
+
+        // Add anti-aliasing particles
+        for (let y = 0; y < canvas.height; y += 2) {
+          for (let x = 0; x < canvas.width; x += 2) {
+            if (
+              data[(y * canvas.width + x) * 4 + 3] > 0 &&
+              data[(y * canvas.width + x) * 4 + 3] <= 128
+            ) {
+              particles.push(
+                new Particle(x, y, data[(y * canvas.width + x) * 4 + 3] / 255)
+              );
+            }
+          }
+        }
+      }
+
+      // Animation loop
+      function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        for (let i = 0; i < particles.length; i++) {
+          particles[i].update();
+          particles[i].draw();
+        }
+        requestAnimationFrame(animate);
+      }
+
+      // Mouse move event listener
+      window.addEventListener("mousemove", function (event) {
+        mouse.x = event.x;
+        mouse.y = event.y;
+      });
+
+      // Window resize event listener
+      window.addEventListener("resize", function () {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        init();
+      });
+
+      // Submit button event listener
+      submitButton.addEventListener("click", function () {
+        PlaceYourText(textInput.value);
+      });
+
+      // Enter key event listener
+      textInput.addEventListener("keypress", function (e) {
+        if (e.key === "Enter") {
+          PlaceYourText(textInput.value);
+        }
+      });
+
+      // Wait for fonts to be ready before initializing and animating
+      document.fonts.ready.then(() => {
+        init();
+        animate();
+      });
+    </script>
+  </body>
+</html>
